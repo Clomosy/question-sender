@@ -41,15 +41,37 @@ var
   TypeCombo : TCLComboBox;
   myArrayString  : TclArrayString;
   UsersList,gidenKullanicilar:TclStringList;
-  QMemList:TclJSonQuery;
+  QMemList,QMemoList:TclJSonQuery;
+  
+  testCombo : TClComboBox;
+  
+  procedure MyMQTTStatusChanged;
+begin
+  if Not MyMQTT.Connected then
+  begin
+    BtnSend.Enabled := False;
+    BtnSend.Text := 'Bağlantı Bekleniyor';
+    try
+    MyMQTT.Connect;
+    except
+    ShowMessage('İnternet bağlantınızı kontrol ediniz... ' + 'Exception Class: ' + LastExceptionClassName + ' Exception Message: ' + LastExceptionMessage);
+    end;
+  end;
+  if MyMQTT.Connected then
+  begin
+    BtnSend.Text := 'Gönder';
+    BtnSend.Enabled := True;
+  end;
+end;
 
-  Procedure ReloadChartData;  //WİNDOWS ÜZERİNDE 
+  procedure ReloadChartData;  //WİNDOWS ÜZERİNDE 
   Var i,y   :Integer;
     LineStr :String;
     
     begin
       simpleJSONStr:='';
       myArrayString := TclArrayString.Create;
+      //myArrayString('clGreen','clRed','clYellow','clBlue','clYellowGreen','clAzure','clTomato','clPurple','clPink','clGold','clPeru','clOrange');
       myArrayString.Add('clGreen');
       myArrayString.Add('clYellow');
       myArrayString.Add('clYellowGreen');
@@ -64,21 +86,23 @@ var
       myArrayString.Add('clOrange');
       
       
-      For i:=0 To MemOptions.Lines.Count-1 Do 
-      Begin 
+      For i :=0 To MemOptions.Lines.Count-1 do 
+      begin 
         myArrayString.GetItem(i);
         LineStr:=Clomosy.StringListItemString(MemOptions.Lines,i);
         LineStr:='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(myArrayInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
-        If simpleJSONStr='' Then 
-        simpleJSONStr := simpleJSONStr + LineStr Else simpleJSONStr := simpleJSONStr + ',' + LineStr
-      End;
+        If simpleJSONStr = '' then
+        simpleJSONStr := simpleJSONStr + LineStr 
+        Else 
+        simpleJSONStr := simpleJSONStr + ',' + LineStr
+      end;
        
       simpleJSONStr := '['+simpleJSONStr+']';
       questionChart.clLoadDataFromJSONStr(simpleJSONStr);
-    End;
+    end;
     
     
-  Procedure MyMQTTPublishReceived;
+  procedure MyMQTTPublishReceived;
   var 
     myStr,userGUID,userReply:String;
     i,j: Integer;
@@ -87,12 +111,13 @@ var
     begin
       varCntl := False;
       receivedUser := False;
-      If Not MyMQTT.ReceivedAlright Then Exit;
-      If Clomosy.PlatformIsMobile then
+      if Not MyMQTT.ReceivedAlright then
+      Exit;
+      if Clomosy.PlatformIsMobile then
       begin
         for j := 0 to UsersList.Count - 1 do
         begin
-          if Clomosy.StringListItemString(gidenKullanicilar,j) = userGUID then
+          if Clomosy.StringListItemString(gidenKullanicilar,j) = userGUID then 
           begin
             receivedUser := True;
           end;
@@ -100,16 +125,15 @@ var
         if receivedUser = False then
         begin
           MyStr := MyMQTT.ReceivedMessage;
-          IF POS(';',MyStr)=0 Then  Exit; 
-          
-          If askMemo.Text = clGetStringTo(MyStr,';') then
-          begin
+          if POS(';',MyStr) = 0 then  
           Exit;
           
-          end else
+          if askMemo.Text = clGetStringTo(MyStr,';') then
           begin
-            //uygulamayı sonradan acanlar için soru gönder butonuna tekrar basılması yeterli olur ancak bu arada önce açıp, 
-            //bu soruya cevap veren tekrar cevap verememesi için soru değişti mi kontrol edilir.
+          Exit;
+          end; 
+          else
+          begin
             RdoGrp.Enabled := True;
             RdoGrp.ItemIndex := -1;
             
@@ -121,14 +145,16 @@ var
             
             BtnSend.Enabled := RdoGrp.Items.Text<>'';
             BtnSend.Text := 'Gönder';
-            IF BtnSend.Enabled Then
-              LblDisplay.Text := 'Seçiminizi Yapıp Göndere Basınız';
+            if BtnSend.Enabled then
+            LblDisplay.Text := 'Seçiminizi Yapıp Göndere Basınız';
           end;
         end; 
-      End Else 
-      Begin //windows exe tarafında veri geldiğinde
+      end; 
+      else 
+      begin 
         MyStr := MyMQTT.ReceivedMessage; 
-        IF POS(';',MyStr)>0 Then   Exit;
+        if POS(';',MyStr)>0 then   
+        Exit;//içinde ; varsa çık
         
         userGUID := clGetStringTo(MyStr,'|');
         userReply := clGetStringAfter(MyStr,'|');
@@ -145,50 +171,75 @@ var
           if varCntl = False then
           begin
             UsersList.Add(userGUID);
-             myArrayInteger.SetItem(StrToInt(userReply),myArrayInteger.GetItem(StrToInt(userReply)) + 1); 
+             myArrayInteger.SetItem(StrToInt(userReply),myArrayInteger.GetItem(StrToInt(userReply)) + 1); //değeri 1 arttırır
             ReloadChartData;
           end;
         except
-          ShowMessage('17-Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
+          ShowMessage('Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
         end;
-      End;
-    End;  
+      end;
+    end;  
    
-  Procedure BtnSendClick;
+  procedure BtnSendClick;
   Var
   i,j: Integer;
   mobilVarCntl : Boolean;
   begin
       mobilVarCntl := False;
-      If Clomosy.PlatformIsMobile then
+      if Clomosy.PlatformIsMobile then
       begin
-          IF RdoGrp.ItemIndex>-1 Then
-          Begin
+        if Clomosy.AppUserProfile = 1 then
+        begin
+          if testCombo.GetValueIndex(testCombo.ItemIndex) = '00' then
+          begin
+            ShowMessage('Lütfen bir kullanıcı seçiniz.');
+          end; 
+          else
+          begin
+          if RdoGrp.ItemIndex>-1 then
+          begin
+            RdoGrp.Enabled := False;
+            BtnSend.Enabled := False;
+            MyMQTT.Send(testCombo.GetValueIndex(testCombo.ItemIndex)+'|'+IntToStr(RdoGrp.ItemIndex));
+            LblDisplay.Text := 'Yeni Soru Bekleniyor';
+            BtnSend.Text := 'Seçiminiz Gönderildi';
+          end; 
+          else 
+          ShowMessage('Lütfen Bir Seçim Yapınız!');
+          end;
+        end; 
+        else
+        begin
+        if RdoGrp.ItemIndex>-1 then
+          begin
             RdoGrp.Enabled := False;
             BtnSend.Enabled := False;
             MyMQTT.Send(Clomosy.AppUserGUID+'|'+IntToStr(RdoGrp.ItemIndex));
             LblDisplay.Text := 'Yeni Soru Bekleniyor';
             BtnSend.Text := 'Seçiminiz Gönderildi';
-            
-          end Else ShowMessage('Lütfen Bir Seçim Yapınız!');
-      End Else
-      Begin//windows exe tarafında yapılan işlemler
-       
-         If (Trim(QuestionMemo.Text)<>'') and (Trim(MemOptions.Text)<>'') Then
-         Begin
+          end; 
+          else 
+          ShowMessage('Lütfen Bir Seçim Yapınız!');
+        end;
+      end; 
+      else
+      begin
+         if (Trim(QuestionMemo.Text)<>'') and (Trim(MemOptions.Text)<>'') then
+         begin
              MemOptions.Text := Trim(MemOptions.Text);
             
-             If questionChart.ChartItemText <> QuestionMemo.Text Then 
-             Begin
-               myArrayInteger.RemoveAll;//diziyi sıfırla
+             if questionChart.ChartItemText <> QuestionMemo.Text then
+             begin
+               myArrayInteger.RemoveAll;
                UsersList.Clear;
                questionChart.ChartItemText := QuestionMemo.Text;
-               For i:=0 To MemOptions.Lines.Count Do myArrayInteger.Add(0);//yeni secenek sayısı kadar diziye eleman oluştur
+               for i:=0 To MemOptions.Lines.Count do 
+               myArrayInteger.Add(0);
                ReloadChartData;
-               MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);//soru ve secenekler arasında ";" ayracı ile gönderilir
-             End else
+               MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);
+             end; 
+             else
              begin
-              
               with QMemList do
              begin
                if Found then
@@ -196,7 +247,6 @@ var
                  First;
                  while not EOF do
                  begin
-                    
                    for j := 0 to gidenKullanicilar.Count - 1 do
                   begin
                     mobilVarCntl := False;
@@ -209,7 +259,7 @@ var
                   end;
                    if mobilVarCntl = false then
                    begin
-                    MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);//soru ve secenekler arasında ";" ayracı ile gönderilir
+                    MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);
                     break;
                     end;
                    Next;
@@ -217,22 +267,23 @@ var
                end;
              end;
             end;
-         End Else ShowMessage('Soru ve Seçenekler olmalı!');
-      End;
-  End;
+         end; 
+         else 
+         ShowMessage('Soru ve Seçenekler olmalı!');
+      end;
+  end;
   
   
-Procedure TypeGrapic;
+procedure TypeGrapic;
 var 
   str : String;
   I,grapic : Integer;
-Begin
+begin
   
     str := TypeCombo.GetValueIndex(TypeCombo.ItemIndex);
     grapic := StrToInt(str);
     myArrayString := TclArrayString.Create;
     
-    //myArrayString('clGreen','clRed','clYellow','clBlue','clYellowGreen','clAzure','clTomato','clPurple','clPink','clGold','clPeru','clOrange');
     myArrayString.Add('clGreen');
     myArrayString.Add('clYellow');
     myArrayString.Add('clYellowGreen');
@@ -247,13 +298,13 @@ Begin
     myArrayString.Add('clOrange');
     
     
-    For i:=0 To MemOptions.Lines.Count-1 Do 
-    Begin 
+    For i := 0 To MemOptions.Lines.Count-1 do
+    begin 
         myArrayString.GetItem(i);
         LineStr:=Clomosy.StringListItemString(MemOptions.Lines,i);
         LineStr:='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(myArrayInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
         
-        if grapic = 1 then 
+        if grapic = 1 then
         begin
           questionChart.Charttype := clCBar;
           questionChart.clLoadDataFromJSONStr(simpleJSONStr);
@@ -268,10 +319,59 @@ Begin
           questionChart.Charttype := clCPie;
           questionChart.clLoadDataFromJSONStr(simpleJSONStr);
         end;
-    End;
+    end;
   
     
-End;
+end;
+
+procedure ComboSelected;
+var
+  SelectedValue : Integer;
+begin
+  if testCombo.ItemIndex = -1 then
+  begin
+    ShowMessage('Proje listesinde üye yok!');
+  end;
+  if Clomosy.PlatformIsMobile then
+  begin
+    if Clomosy.AppUserProfile = 1 then
+    begin
+      if askMemo.Text <> '' then
+      begin
+        RdoGrp.Enabled := True;
+        BtnSend.Enabled := RdoGrp.Items.Text<>'';
+        BtnSend.Text := 'Gönder';
+        if BtnSend.Enabled then
+        LblDisplay.Text := 'Seçiminizi Yapıp Göndere Basınız';
+      end;
+    end;
+  end;
+end;
+
+procedure addComboBox;
+begin
+  
+  try
+    QMemoList := TCLJSONQuery.Create(self);
+    QMemoList := Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0');
+    testCombo.AddItem('Adınızı Seçiniz..','00');
+    with QMemoList do
+     begin
+       if Found then
+       begin
+         First;
+         while not EOF do
+         begin
+            testCombo.AddItem(FieldByName('Member_Name').AsString,FieldByName('Member_GUID').AsString);
+            MyForm.AddNewEvent(testCombo,tbeOnChange,'ComboSelected');
+            Next;
+         end;
+       end;
+     end;
+  except
+    ShowMessage('Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
+  end;
+end;
     
 begin 
   MyForm := TclForm.Create(Self);
@@ -280,6 +380,9 @@ begin
   QMemList := Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0 ORDER BY NEWID()');
   LblDisplay:= MyForm.AddNewLabel(MyForm,'LblDisplay','--');
   LblDisplay.Visible := False;
+  
+  testCombo := MyForm.AddNewComboBox(MyForm,'testCombo');
+  testCombo.Visible := False;
   
   //GONDER BUTONU İKİ PLATFORMDA ÇIKIYOR
   BtnSend:= MyForm.AddNewProButton(MyForm,'BtnSend','Gönder');
@@ -294,12 +397,13 @@ begin
   RdoGrp.Align := alTop;
 
   MyMQTT := MyForm.AddNewMQTTConnection(MyForm,'MyMQTT');
+  MyForm.AddNewEvent(MyMQTT,tbeOnMQTTStatusChanged,'MyMQTTStatusChanged');
   MyForm.AddNewEvent(MyMQTT,tbeOnMQTTPublishReceived,'MyMQTTPublishReceived');
   MyMQTT.Channel := 'OnlineQuiz';//project guid + channel
   MyMQTT.Connect;
   
-  If Clomosy.PlatformIsMobile then //MOBİL EKRANI
-  Begin
+  if Clomosy.PlatformIsMobile then //MOBİL EKRANI
+  begin
     LblDisplay.Text := 'İçerik Bekleniyor...';
     LblDisplay.Align := almostTop;
     LblDisplay.Visible := True;
@@ -318,9 +422,20 @@ begin
     BtnSend.Align := alBottom;
     BtnSend.Height := BtnSend.Height*2;
     BtnSend.Enabled := False;
+    
+    if Clomosy.AppUserProfile = 1 then
+    begin
+      testCombo.Visible := True;
+      testCombo.Align := alMostTop;
+      testCombo.Margins.Top := 10;
+      testCombo.Margins.Left := 50;
+      testCombo.Margins.Right := 50;
+      addComboBox;
+    end;
   
-  End Else 
-  Begin     //WİNDOWS EKRANI
+  end; 
+  else 
+  begin     //WİNDOWS EKRANI
     myArrayInteger := TClArrayInteger.Create;
     
     QuestionMemo:= MyForm.AddNewMemo(MyForm,'QuestionMemo','Sorunuzu girebilirsiniz...');
@@ -354,21 +469,25 @@ begin
     grafikCmboLayout.Align:=albottom;
     grafikCmboLayout.Height := 50;
   
-    TypeCombo := MyForm.AddNewComboBox(grafikCmboLayout,'testCombo');
+    TypeCombo := MyForm.AddNewComboBox(grafikCmboLayout,'TypeCombo');
     TypeCombo.Align := alcenter;
     TypeCombo.Width := 300;
     TypeCombo.Margins.Bottom:=6;
     TypeCombo.Margins.Left :=50;
     TypeCombo.Margins.Right :=10;
+   
     
     TypeCombo.AddItem('Bar Grafiği','1');
     TypeCombo.AddItem('Çizgi Grafik','2');
     TypeCombo.AddItem('Pasta Grafiği','3');
     MyForm.AddNewEvent(TypeCombo,tbeOnChange,'TypeGrapic');
     
-  End;
+  end;
   
   
+  if Clomosy.PlatformIsMobile then
   MyForm.Run;
+  else
+  MyForm.RunModal;
 
 end;

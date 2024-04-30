@@ -41,7 +41,28 @@ var
   TypeCombo : TCLComboBox;
   myArrayString  : TclArrayString;
   UsersList,gidenKullanicilar:TclStringList;
-  QMemList:TclJSonQuery;
+  QMemList,QMemoList:TclJSonQuery;
+  
+  testCombo : TClComboBox;
+  
+  void MyMQTTStatusChanged;
+{
+  if (Not MyMQTT.Connected ) 
+  {
+    BtnSend.Enabled = False;
+    BtnSend.Text = 'Bağlantı Bekleniyor';
+    try
+       MyMQTT.Connect;
+    except
+      ShowMessage('İnternet bağlantınızı kontrol ediniz... ' + 'Exception Class: ' + LastExceptionClassName + ' Exception Message: ' + LastExceptionMessage);
+    }
+  }
+  if (MyMQTT.Connected ) 
+  {
+    BtnSend.Text = 'Gönder';
+    BtnSend.Enabled = True;
+  }
+}
 
   void ReloadChartData;  //WİNDOWS ÜZERİNDE 
   Var i,y   :Integer;
@@ -122,7 +143,7 @@ var
             BtnSend.Enabled = RdoGrp.Items.Text<>'';
             BtnSend.Text = 'Gönder';
             IF (BtnSend.Enabled) 
-              LblDisplay.Text = 'Seçiminizi Yapıp Göndere Basınız';
+            LblDisplay.Text = 'Seçiminizi Yapıp Göndere Basınız';
           }
         } 
       } Else 
@@ -134,7 +155,6 @@ var
         userReply = clGetStringAfter(MyStr,'|');
         
         try
-        {
           for (i = 0 to UsersList.Count - 1) 
           {
             if (Clomosy.StringListItemString(UsersList,i) == userGUID) 
@@ -149,13 +169,9 @@ var
              myArrayInteger.SetItem(StrToInt(userReply),myArrayInteger.GetItem(StrToInt(userReply)) + 1); //değeri 1 arttırır
             ReloadChartData;
           }
+        except
+          ShowMessage('Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
         }
-        except{
-          ShowMessage('17-Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
-        }
-        
-        
-       
       }
     }  
    
@@ -167,7 +183,25 @@ var
       mobilVarCntl = False;
       If (Clomosy.PlatformIsMobile) 
       {
+        if (Clomosy.AppUserProfile == 1)
+        {
+          if (testCombo.GetValueIndex(testCombo.ItemIndex) == '00') 
+          {
+            ShowMessage('Lütfen bir kullanıcı seçiniz.');
+          } else
+          {
           IF (RdoGrp.ItemIndex>-1) 
+          {
+            RdoGrp.Enabled = False;
+            BtnSend.Enabled = False;
+            MyMQTT.Send(testCombo.GetValueIndex(testCombo.ItemIndex)+'|'+IntToStr(RdoGrp.ItemIndex));
+            LblDisplay.Text = 'Yeni Soru Bekleniyor';
+            BtnSend.Text = 'Seçiminiz Gönderildi';
+          } Else ShowMessage('Lütfen Bir Seçim Yapınız!');
+          }
+        } else
+        {
+        IF (RdoGrp.ItemIndex>-1) 
           {
             RdoGrp.Enabled = False;
             BtnSend.Enabled = False;
@@ -175,6 +209,7 @@ var
             LblDisplay.Text = 'Yeni Soru Bekleniyor';
             BtnSend.Text = 'Seçiminiz Gönderildi';
           } Else ShowMessage('Lütfen Bir Seçim Yapınız!');
+        }
       } Else
       {
        
@@ -221,7 +256,7 @@ var
                }
              }
             }
-         } Else ShowMessage('15-Soru ve Seçenekler olmalı!');
+         } Else ShowMessage('Soru ve Seçenekler olmalı!');
       }
   }
   
@@ -275,6 +310,56 @@ var
   
     
 }
+
+void ComboSelected;
+var
+  SelectedValue : Integer;
+{
+  if (testCombo.ItemIndex == -1)
+  {
+    ShowMessage('Proje listesinde üye yok!');
+  }
+  If (Clomosy.PlatformIsMobile)
+  {
+    if (Clomosy.AppUserProfile == 1)
+    {
+      If (askMemo.Text <> '') 
+      {
+        RdoGrp.Enabled = True;
+        BtnSend.Enabled = RdoGrp.Items.Text<>'';
+        BtnSend.Text = 'Gönder';
+        IF (BtnSend.Enabled) 
+        LblDisplay.Text = 'Seçiminizi Yapıp Göndere Basınız';
+      }
+    }
+  }
+}
+
+void addComboBox;
+{
+  
+  try
+  
+    QMemoList = TCLJSONQuery.Create(self);
+    QMemoList = Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0');
+    testCombo.AddItem('Adınızı Seçiniz..','00');
+    with QMemoList do
+     {
+       if (Found)
+       {
+         First;
+         while (not EOF)
+         {
+            testCombo.AddItem(FieldByName('Member_Name').AsString,FieldByName('Member_GUID').AsString);
+            MyForm.AddNewEvent(testCombo,tbeOnChange,'ComboSelected');
+            Next;
+         }
+       }
+     }
+  except
+    ShowMessage('Exception Class: '+LastExceptionClassName+' Exception Message: '+LastExceptionMessage);
+  }
+}
     
 { 
   MyForm = TclForm.Create(Self);
@@ -283,6 +368,9 @@ var
   QMemList = Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0 ORDER BY NEWID()');
   LblDisplay= MyForm.AddNewLabel(MyForm,'LblDisplay','--');
   LblDisplay.Visible = False;
+  
+  testCombo = MyForm.AddNewComboBox(MyForm,'testCombo');
+  testCombo.Visible = False;
   
   //GONDER BUTONU İKİ PLATFORMDA ÇIKIYOR
   BtnSend= MyForm.AddNewProButton(MyForm,'BtnSend','Gönder');
@@ -297,6 +385,7 @@ var
   RdoGrp.Align = alTop;
 
   MyMQTT = MyForm.AddNewMQTTConnection(MyForm,'MyMQTT');
+  MyForm.AddNewEvent(MyMQTT,tbeOnMQTTStatusChanged,'MyMQTTStatusChanged');
   MyForm.AddNewEvent(MyMQTT,tbeOnMQTTPublishReceived,'MyMQTTPublishReceived');
   MyMQTT.Channel = 'OnlineQuiz';//project guid + channel
   MyMQTT.Connect;
@@ -321,6 +410,16 @@ var
     BtnSend.Align = alBottom;
     BtnSend.Height = BtnSend.Height*2;
     BtnSend.Enabled = False;
+    
+    if (Clomosy.AppUserProfile == 1)
+    {
+      testCombo.Visible = True;
+      testCombo.Align = alMostTop;
+      testCombo.Margins.Top = 10;
+      testCombo.Margins.Left = 50;
+      testCombo.Margins.Right = 50;
+      addComboBox;
+    }
   
   } Else 
   {     //WİNDOWS EKRANI
@@ -357,12 +456,13 @@ var
     grafikCmboLayout.Align=albottom;
     grafikCmboLayout.Height = 50;
   
-    TypeCombo = MyForm.AddNewComboBox(grafikCmboLayout,'testCombo');
+    TypeCombo = MyForm.AddNewComboBox(grafikCmboLayout,'TypeCombo');
     TypeCombo.Align = alcenter;
     TypeCombo.Width = 300;
     TypeCombo.Margins.Bottom=6;
     TypeCombo.Margins.Left =50;
     TypeCombo.Margins.Right =10;
+   
     
     TypeCombo.AddItem('Bar Grafiği','1');
     TypeCombo.AddItem('Çizgi Grafik','2');
@@ -372,6 +472,9 @@ var
   }
   
   
+  if(Clomosy.PlatformIsMobile) 
   MyForm.Run;
+  else
+  MyForm.RunModal;
 
 }
