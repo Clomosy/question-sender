@@ -1,75 +1,49 @@
-//Depremin büyüklüğünü ve süresini ölçen alete ne ad verilir?
-//Termometre
-//Tomograf
-//Sismograf 
-//Deprem ölçer
-
-//Türkiye'nin en doğusundaki il hangisidir?
-//Iğdır 
-//Kars
-//Van
-//Hakkari
-
-//Gülü ile meşhur olan ilimiz hangisidir?
-//Isparta 
-//Tekirdağ
-//Lüleburgaz
-//Kastamonu
-
-//Türkiye'nin yüzölçümü en geniş şehri hangisidir?
-//Konya 
-//İstanbul
-//Ankara
-//Sivas
-
 var
-  MyForm:TclForm;
-  questionChart : TClChart;
-  simpleJSONStr, LineStr : String;
+  MainForm : TclForm;
+  QuestionChart : TClChart;
+  SimpleJSONStr, LineStr : String;
   
-  LblDisplay:TclLabel;
-  MyMQTT : TclMQTT;
-  BtnSend:TclProButton;
+  LblDisplay : TclLabel;
+  MQTT1 : TclMQTT;
+  BtnSend : TclProButton;
   
-  MemOptions,QuestionMemo,askMemo :TclMemo;
-  RdoGrp:TClRadioGroup;
+  MemOptions,QuestionMemo,AskMemo : TclMemo;
+  RdoGrp : TClRadioGroup;
   
-  myArrayInteger : TclArrayInteger;
-  grafikCmboLayout:TClLayout;
-  
-  gSendButon :TClProButton;
+  ArrInteger : TclArrayInteger;
+  GraphicLyt : TClLayout;
+
   TypeCombo : TCLComboBox;
   myArrayString  : TclArrayString;
-  UsersList,gidenKullanicilar:TclStringList;
-  QMemList,QMemoList:TclJSonQuery;
-  
-  testCombo : TClComboBox;
+  UsersList, OutgoingUsers : TclStringList;
+  QMemList, QMemoList : TclJSonQuery;
+  MemberCombo : TClComboBox;
   
   void MyMQTTStatusChanged;
 {
-  if (Not MyMQTT.Connected ) 
+  if (Not MQTT1.Connected ) 
   {
     BtnSend.Enabled = False;
     BtnSend.Text = 'Bağlantı Bekleniyor';
     try
-       MyMQTT.Connect;
+       MQTT1.Connect;
     except
       ShowMessage('İnternet bağlantınızı kontrol ediniz... ' + 'Exception Class: ' + LastExceptionClassName + ' Exception Message: ' + LastExceptionMessage);
     }
   }
-  if (MyMQTT.Connected ) 
+  if (MQTT1.Connected ) 
   {
     BtnSend.Text = 'Gönder';
     BtnSend.Enabled = True;
   }
 }
 
-  void ReloadChartData;  //WİNDOWS ÜZERİNDE 
+  void ReloadChartData;  //WINDOWS ÜZERINDE 
   Var i,y   :Integer;
     LineStr :String;
     
     {
-      simpleJSONStr='';
+      SimpleJSONStr='';
       myArrayString = TclArrayString.Create;
       //myArrayString('clGreen','clRed','clYellow','clBlue','clYellowGreen','clAzure','clTomato','clPurple','clPink','clGold','clPeru','clOrange');
       myArrayString.Add('clGreen');
@@ -90,14 +64,14 @@ var
       { 
         myArrayString.GetItem(i);
         LineStr=Clomosy.StringListItemString(MemOptions.Lines,i);
-        LineStr='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(myArrayInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
-        If (simpleJSONStr=='') 
-        simpleJSONStr = simpleJSONStr + LineStr 
-        Else simpleJSONStr = simpleJSONStr + ',' + LineStr
+        LineStr='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(ArrInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
+        If (SimpleJSONStr=='') 
+        SimpleJSONStr = SimpleJSONStr + LineStr 
+        Else SimpleJSONStr = SimpleJSONStr + ',' + LineStr
       }
        
-      simpleJSONStr = '['+simpleJSONStr+']';
-      questionChart.clLoadDataFromJSONStr(simpleJSONStr);
+      SimpleJSONStr = '['+SimpleJSONStr+']';
+      QuestionChart.clLoadDataFromJSONStr(SimpleJSONStr);
     }
     
     
@@ -110,22 +84,22 @@ var
     {
       varCntl = False;
       receivedUser = False;
-      If (Not MyMQTT.ReceivedAlright) Exit;
-      If (Clomosy.PlatformIsMobile)
+      If (Not MQTT1.ReceivedAlright) Exit;
+      if ((Clomosy.AppPlatform == 2) || (Clomosy.AppPlatform == 3))
       {
         for (j = 0 to UsersList.Count - 1)
         {
-          if (Clomosy.StringListItemString(gidenKullanicilar,j) == userGUID) 
+          if (Clomosy.StringListItemString(OutgoingUsers,j) == userGUID) 
           {
             receivedUser = True;
           }
         }
         if (receivedUser == False)
         {
-          MyStr = MyMQTT.ReceivedMessage;
+          MyStr = MQTT1.ReceivedMessage;
           IF (POS(';',MyStr)==0)  Exit;
           
-          If (askMemo.Text == clGetStringTo(MyStr,';')) 
+          If (AskMemo.Text == clGetStringTo(MyStr,';')) 
           {
           Exit;
           
@@ -137,7 +111,7 @@ var
             RdoGrp.Title.Text = clGetStringTo(MyStr,';');//SORU
             RdoGrp.Items.Text = clGetStringAfter(MyStr,';');//SECENEKLER
             
-            askMemo.Text = RdoGrp.Title.Text;
+            AskMemo.Text = RdoGrp.Title.Text;
             RdoGrp.Title.Text = '';      
             
             BtnSend.Enabled = RdoGrp.Items.Text<>'';
@@ -148,8 +122,8 @@ var
         } 
       } Else 
       { 
-        MyStr = MyMQTT.ReceivedMessage; 
-        IF (POS(';',MyStr)>0)   Exit;//içinde ; varsa çık
+        MyStr = MQTT1.ReceivedMessage; 
+        IF (POS(';',MyStr)>0)   Exit;//içinde ; varsa çik
         
         userGUID = clGetStringTo(MyStr,'|');
         userReply = clGetStringAfter(MyStr,'|');
@@ -166,7 +140,7 @@ var
           if (varCntl == False) 
           {
             UsersList.Add(userGUID);
-             myArrayInteger.SetItem(StrToInt(userReply),myArrayInteger.GetItem(StrToInt(userReply)) + 1); //değeri 1 arttırır
+             ArrInteger.SetItem(StrToInt(userReply),ArrInteger.GetItem(StrToInt(userReply)) + 1);
             ReloadChartData;
           }
         except
@@ -177,15 +151,15 @@ var
    
   void BtnSendClick;
   Var
-  i,j: Integer;
-  mobilVarCntl : Boolean;
+    i,j: Integer;
+    mobilVarCntl : Boolean;
   {
       mobilVarCntl = False;
-      If (Clomosy.PlatformIsMobile) 
+      if ((Clomosy.AppPlatform == 2) || (Clomosy.AppPlatform == 3))
       {
         if (Clomosy.AppUserProfile == 1)
         {
-          if (testCombo.GetValueIndex(testCombo.ItemIndex) == '00') 
+          if (MemberCombo.GetValueIndex(MemberCombo.ItemIndex) == '00') 
           {
             ShowMessage('Lütfen bir kullanıcı seçiniz.');
           } else
@@ -194,7 +168,7 @@ var
           {
             RdoGrp.Enabled = False;
             BtnSend.Enabled = False;
-            MyMQTT.Send(testCombo.GetValueIndex(testCombo.ItemIndex)+'|'+IntToStr(RdoGrp.ItemIndex));
+            MQTT1.Send(MemberCombo.GetValueIndex(MemberCombo.ItemIndex)+'|'+IntToStr(RdoGrp.ItemIndex));
             LblDisplay.Text = 'Yeni Soru Bekleniyor';
             BtnSend.Text = 'Seçiminiz Gönderildi';
           } Else ShowMessage('Lütfen Bir Seçim Yapınız!');
@@ -205,58 +179,56 @@ var
           {
             RdoGrp.Enabled = False;
             BtnSend.Enabled = False;
-            MyMQTT.Send(Clomosy.AppUserGUID+'|'+IntToStr(RdoGrp.ItemIndex));
+            MQTT1.Send(Clomosy.AppUserGUID+'|'+IntToStr(RdoGrp.ItemIndex));
             LblDisplay.Text = 'Yeni Soru Bekleniyor';
             BtnSend.Text = 'Seçiminiz Gönderildi';
           } Else ShowMessage('Lütfen Bir Seçim Yapınız!');
         }
       } Else
       {
-       
-         If ((Trim(QuestionMemo.Text)<>'') && (Trim(MemOptions.Text)<>'')) 
-         {
-             MemOptions.Text = Trim(MemOptions.Text);
+       If ((Trim(QuestionMemo.Text)<>'') && (Trim(MemOptions.Text)<>'') && (Trim(QuestionMemo.Text)<>'Sorunuzu girebilirsiniz...') && (Trim(MemOptions.Text)<>'Seçenekleri girebilirsiniz..')) 
+       {
+           MemOptions.Text = Trim(MemOptions.Text);
+          
+           If (QuestionChart.ChartItemText <> QuestionMemo.Text)
+           {
+             ArrInteger.RemoveAll;
+             UsersList.Clear;
+             QuestionChart.ChartItemText = QuestionMemo.Text;
+             For (i=0 To MemOptions.Lines.Count)  ArrInteger.Add(0);
+             ReloadChartData;
+             MQTT1.Send(QuestionMemo.Text + ';' + MemOptions.Text);
+           } else
+           {
             
-             If (questionChart.ChartItemText <> QuestionMemo.Text)
+            with QMemList do
+           {
+             if (Found) 
              {
-               myArrayInteger.RemoveAll;
-               UsersList.Clear;
-               questionChart.ChartItemText = QuestionMemo.Text;
-               For (i=0 To MemOptions.Lines.Count)  myArrayInteger.Add(0);
-               ReloadChartData;
-               MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);
-             } else
-             {
-              
-              
-              with QMemList do
-             {
-               if (Found) 
+               First;
+               while (not EOF) 
                {
-                 First;
-                 while (not EOF) 
-                 {
-                   for (j = 0 to gidenKullanicilar.Count - 1) 
+                 for (j = 0 to OutgoingUsers.Count - 1) 
+                {
+                  mobilVarCntl = False;
+                  if (Clomosy.StringListItemString(OutgoingUsers,j) == FieldByName('Member_GUID').AsString)
                   {
-                    mobilVarCntl = False;
-                    if (Clomosy.StringListItemString(gidenKullanicilar,j) == FieldByName('Member_GUID').AsString)
-                    {
-                      mobilVarCntl = True;
-                      gidenKullanicilar.Add(FieldByName('Member_GUID').AsString);
-                      break;
-                    }
-                  }
-                   if (mobilVarCntl == false)
-                   {
-                    MyMQTT.Send(QuestionMemo.Text + ';' + MemOptions.Text);
+                    mobilVarCntl = True;
+                    OutgoingUsers.Add(FieldByName('Member_GUID').AsString);
                     break;
-                    }
-                   Next;
-                 }
+                  }
+                }
+                 if (mobilVarCntl == false)
+                 {
+                  MQTT1.Send(QuestionMemo.Text + ';' + MemOptions.Text);
+                  break;
+                  }
+                 Next;
                }
              }
-            }
-         } Else ShowMessage('Soru ve Seçenekler olmalı!');
+           }
+          }
+       } Else ShowMessage('Soru ve Seçenekler olmalı!');
       }
   }
   
@@ -284,28 +256,27 @@ var
     myArrayString.Add('clPeru');
     myArrayString.Add('clOrange');
     
-    
     For (i=0 To MemOptions.Lines.Count-1) 
     { 
-        myArrayString.GetItem(i);
-        LineStr=Clomosy.StringListItemString(MemOptions.Lines,i);
-        LineStr='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(myArrayInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
-        
-        if (grapic == 1)  
-        {
-          questionChart.Charttype = clCBar;
-          questionChart.clLoadDataFromJSONStr(simpleJSONStr);
-        }
-        if (grapic == 2) 
-        {
-          questionChart.Charttype = clCLine;
-          questionChart.clLoadDataFromJSONStr(simpleJSONStr);
-        }
-        if (grapic == 3) 
-        {
-          questionChart.Charttype = clCPie;
-          questionChart.clLoadDataFromJSONStr(simpleJSONStr);
-        }
+      myArrayString.GetItem(i);
+      LineStr=Clomosy.StringListItemString(MemOptions.Lines,i);
+      LineStr='{"OptionValue":"'+LineStr+'","OptionCount":"'+ IntToStr(ArrInteger.GetItem(i))+'","color":"'+myArrayString.GetItem(i)+'"}';
+      
+      if (grapic == 1)  
+      {
+        QuestionChart.Charttype = clCBar;
+        QuestionChart.clLoadDataFromJSONStr(SimpleJSONStr);
+      }
+      if (grapic == 2) 
+      {
+        QuestionChart.Charttype = clCLine;
+        QuestionChart.clLoadDataFromJSONStr(SimpleJSONStr);
+      }
+      if (grapic == 3) 
+      {
+        QuestionChart.Charttype = clCPie;
+        QuestionChart.clLoadDataFromJSONStr(SimpleJSONStr);
+      }
     }
   
     
@@ -315,15 +286,15 @@ void ComboSelected;
 var
   SelectedValue : Integer;
 {
-  if (testCombo.ItemIndex == -1)
+  if (MemberCombo.ItemIndex == -1)
   {
     ShowMessage('Proje listesinde üye yok!');
   }
-  If (Clomosy.PlatformIsMobile)
+  if ((Clomosy.AppPlatform == 2) || (Clomosy.AppPlatform == 3))
   {
     if (Clomosy.AppUserProfile == 1)
     {
-      If (askMemo.Text <> '') 
+      If (AskMemo.Text <> '') 
       {
         RdoGrp.Enabled = True;
         BtnSend.Enabled = RdoGrp.Items.Text<>'';
@@ -342,7 +313,7 @@ void addComboBox;
   
     QMemoList = TCLJSONQuery.Create(self);
     QMemoList = Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0');
-    testCombo.AddItem('Adınızı Seçiniz..','00');
+    MemberCombo.AddItem('Adınızı Seçiniz..','00');
     with QMemoList do
      {
        if (Found)
@@ -350,8 +321,8 @@ void addComboBox;
          First;
          while (not EOF)
          {
-            testCombo.AddItem(FieldByName('Member_Name').AsString,FieldByName('Member_GUID').AsString);
-            MyForm.AddNewEvent(testCombo,tbeOnChange,'ComboSelected');
+            MemberCombo.AddItem(FieldByName('Member_Name').AsString,FieldByName('Member_GUID').AsString);
+            MainForm.AddNewEvent(MemberCombo,tbeOnChange,'ComboSelected');
             Next;
          }
        }
@@ -362,46 +333,99 @@ void addComboBox;
 }
     
 { 
-  MyForm = TclForm.Create(Self);
+  MainForm = TclForm.Create(Self);
+  TclButton(MainForm.clFindComponent('BtnFormMenu')).Visible = False;
   UsersList = Clomosy.StringListNew;
-  gidenKullanicilar =  Clomosy.StringListNew;
+  OutgoingUsers =  Clomosy.StringListNew;
   QMemList = Clomosy.DBCloudQueryWith(ftMembers,'','ISNULL(PMembers.Rec_Deleted,0)=0 ORDER BY NEWID()');
-  LblDisplay= MyForm.AddNewLabel(MyForm,'LblDisplay','--');
+  LblDisplay= MainForm.AddNewLabel(MainForm,'LblDisplay','--');
   LblDisplay.Visible = False;
   
-  testCombo = MyForm.AddNewComboBox(MyForm,'testCombo');
-  testCombo.Visible = False;
+  MemberCombo = MainForm.AddNewComboBox(MainForm,'MemberCombo');
+  MemberCombo.Align = alMostTop;
+  MemberCombo.Margins.Top = 10;
+  MemberCombo.Margins.Left = 50;
+  MemberCombo.Margins.Right = 50;
+  MemberCombo.Visible = False;
   
-  //GONDER BUTONU İKİ PLATFORMDA ÇIKIYOR
-  BtnSend= MyForm.AddNewProButton(MyForm,'BtnSend','Gönder');
-  MyForm.AddNewEvent(BtnSend,tbeOnClick,'BtnSendClick');
-
-   askMemo = MyForm.AddNewMemo(MyForm,'askMemo','');
-   askMemo.TextSettings.WordWrap = True;
-   askMemo.Visible = False;
-
-  RdoGrp = MyForm.AddNewRadioGroup(MyForm,'RdoGrp','⌛');  
+  //GONDER BUTONU IKI PLATFORMDA ÇIKIYOR
+  BtnSend= MainForm.AddNewProButton(MainForm,'BtnSend','Gönder');
+  MainForm.AddNewEvent(BtnSend,tbeOnClick,'BtnSendClick');
+  
+  AskMemo = MainForm.AddNewMemo(MainForm,'AskMemo','');
+  AskMemo.TextSettings.WordWrap = True;
+  AskMemo.Visible = False;
+  
+  RdoGrp = MainForm.AddNewRadioGroup(MainForm,'RdoGrp','?');  
   RdoGrp.Visible = False;
   RdoGrp.Align = alTop;
-
-  MyMQTT = MyForm.AddNewMQTTConnection(MyForm,'MyMQTT');
-  MyForm.AddNewEvent(MyMQTT,tbeOnMQTTStatusChanged,'MyMQTTStatusChanged');
-  MyForm.AddNewEvent(MyMQTT,tbeOnMQTTPublishReceived,'MyMQTTPublishReceived');
-  MyMQTT.Channel = 'OnlineQuiz';//project guid + channel
-  MyMQTT.Connect;
   
-  If (Clomosy.PlatformIsMobile) //MOBİL EKRANI
+  MQTT1 = MainForm.AddNewMQTTConnection(MainForm,'MQTT1');
+  MainForm.AddNewEvent(MQTT1,tbeOnMQTTStatusChanged,'MyMQTTStatusChanged');
+  MainForm.AddNewEvent(MQTT1,tbeOnMQTTPublishReceived,'MyMQTTPublishReceived');
+  MQTT1.Channel = 'OnlineQuiz';//project guid + channel
+  MQTT1.Connect;
+  
+  if ((Clomosy.AppPlatform == 0) || (Clomosy.AppPlatform == 1) || (Clomosy.AppPlatform == 5)) //Windows - Linux - Mac
+  {
+    ArrInteger = TClArrayInteger.Create;
+    
+    QuestionMemo= MainForm.AddNewMemo(MainForm,'QuestionMemo','Sorunuzu girebilirsiniz...');
+    QuestionMemo.Align = alTop;
+    QuestionMemo.WordWrap = True;
+    QuestionMemo.Height = QuestionMemo.Height;
+    
+    MemOptions= MainForm.AddNewMemo(MainForm,'MemOptions','Seçenekleri girebilirsiniz..');
+    MemOptions.Align = alBottom;
+    MemOptions.Align = alTop;
+    MemOptions.Height = MemOptions.Height*4;
+    BtnSend.Align = alTop;
+    
+    QuestionChart = MainForm.AddNewChart(MainForm,'QuestionChart','Title');
+    SimpleJSONStr = '[{ "OptionValue": "Value1","OptionCount": 0,"color":"clOrange"}]';
+    QuestionChart.Align = alClient;
+    QuestionChart.Margins.Left = 10;
+    QuestionChart.Margins.Right = 10;
+    QuestionChart.Charttype = clCBar;
+    QuestionChart.XAxisText ='OptionValue';
+    QuestionChart.ChartItemText = 'Soru Cevap';
+    QuestionChart.ChartItemsValue = 'OptionCount';
+    QuestionChart.ChartTitle = 'Kim Milyoner Olmak İster Formatında Seyirci Cevapları Demo Uygulaması';
+    QuestionChart.Xaxis.AutoSize =False;
+    QuestionChart.Yaxis.AutoSize =False;
+    QuestionChart.clLoadDataFromJSONStr(SimpleJSONStr);
+    QuestionChart.SeriesMargins.Top = 20; 
+    
+    
+    GraphicLyt = MainForm.AddNewLayout(MainForm,'GraphicLyt');
+    GraphicLyt.Align=albottom;
+    GraphicLyt.Height = 50;
+    
+    TypeCombo = MainForm.AddNewComboBox(GraphicLyt,'TypeCombo');
+    TypeCombo.Align = alcenter;
+    TypeCombo.Width = 300;
+    TypeCombo.Margins.Bottom=6;
+    TypeCombo.Margins.Left =50;
+    TypeCombo.Margins.Right =10;
+    
+    
+    TypeCombo.AddItem('Bar Grafigi','1');
+    TypeCombo.AddItem('Çizgi Grafik','2');
+    TypeCombo.AddItem('Pasta Grafigi','3');
+    MainForm.AddNewEvent(TypeCombo,tbeOnChange,'TypeGrapic');
+    
+  } Else //MOBIL EKRANI
   {
     LblDisplay.Text = 'İçerik Bekleniyor...';
     LblDisplay.Align = almostTop;
     LblDisplay.Visible = True;
     LblDisplay.Height = LblDisplay.Height*4;
-
-    askMemo.Align = alTop;
-    askMemo.Text ='Soru...';
-    askMemo.Visible = True;
-    askMemo.Height = askMemo.Height*3;
-    askMemo.ReadOnly = True;
+    
+    AskMemo.Align = alTop;
+    AskMemo.Text ='Soru...';
+    AskMemo.Visible = True;
+    AskMemo.Height = AskMemo.Height*3;
+    AskMemo.ReadOnly = True;
     
     RdoGrp.Visible = True;
     RdoGrp.Align = alClient;
@@ -413,68 +437,14 @@ void addComboBox;
     
     if (Clomosy.AppUserProfile == 1)
     {
-      testCombo.Visible = True;
-      testCombo.Align = alMostTop;
-      testCombo.Margins.Top = 10;
-      testCombo.Margins.Left = 50;
-      testCombo.Margins.Right = 50;
+      MemberCombo.Visible = True;
       addComboBox;
     }
-  
-  } Else 
-  {     //WİNDOWS EKRANI
-    myArrayInteger = TClArrayInteger.Create;
-    
-    QuestionMemo= MyForm.AddNewMemo(MyForm,'QuestionMemo','Sorunuzu girebilirsiniz...');
-    QuestionMemo.Align = alTop;
-    QuestionMemo.WordWrap = True;
-    QuestionMemo.Height = QuestionMemo.Height;
-
-    MemOptions= MyForm.AddNewMemo(MyForm,'MemOptions','Seçenekleri girebilirsiniz..');
-    MemOptions.Align = alBottom;
-    MemOptions.Align = alTop;
-    MemOptions.Height = MemOptions.Height*4;
-    BtnSend.Align = alTop;
-   
-    questionChart = MyForm.AddNewChart(MyForm,'questionChart','Title');
-    simpleJSONStr = '[{ "OptionValue": "Value1","OptionCount": 0,"color":"clOrange"}]';
-    questionChart.Align = alClient;
-    questionChart.Margins.Left = 10;
-    questionChart.Margins.Right = 10;
-    questionChart.Charttype = clCBar;
-    questionChart.XAxisText ='OptionValue';
-    questionChart.ChartItemText = 'Soru Cevap';
-    questionChart.ChartItemsValue = 'OptionCount';
-    questionChart.ChartTitle = 'Kim Milyoner Olmak İster Formatında Seyirci Cevapları Demo Uygulaması';
-    questionChart.Xaxis.AutoSize =False;
-    questionChart.Yaxis.AutoSize =False;
-    questionChart.clLoadDataFromJSONStr(simpleJSONStr);
-    questionChart.SeriesMargins.Top = 20; 
-
-  
-    grafikCmboLayout = MyForm.AddNewLayout(MyForm,'grafikCmboLayout');
-    grafikCmboLayout.Align=albottom;
-    grafikCmboLayout.Height = 50;
-  
-    TypeCombo = MyForm.AddNewComboBox(grafikCmboLayout,'TypeCombo');
-    TypeCombo.Align = alcenter;
-    TypeCombo.Width = 300;
-    TypeCombo.Margins.Bottom=6;
-    TypeCombo.Margins.Left =50;
-    TypeCombo.Margins.Right =10;
-   
-    
-    TypeCombo.AddItem('Bar Grafiği','1');
-    TypeCombo.AddItem('Çizgi Grafik','2');
-    TypeCombo.AddItem('Pasta Grafiği','3');
-    MyForm.AddNewEvent(TypeCombo,tbeOnChange,'TypeGrapic');
-    
   }
-  
-  
-  if(Clomosy.PlatformIsMobile) 
-  MyForm.Run;
+
+  if ((Clomosy.AppPlatform == 2) || (Clomosy.AppPlatform == 3)) // mobil ise
+    MainForm.Run;
   else
-  MyForm.RunModal;
+    MainForm.RunModal;
 
 }
