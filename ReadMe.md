@@ -6,18 +6,14 @@ This project involves an online quiz application where users can answer question
 
 ## Usage
 
+Windows Platform:
+  - The desktop application provides a screen where users can type and submit questions and answers.
+  - At the bottom of this screen, the questions previously answered by mobile users are listed, and the results of these answers can be viewed through graphs.
+
+### Note: Users should be allowed to access the project before submitting a question.
+
 Mobile Platform:
+  - The mobile application offers a user interface that displays questions along with the corresponding answer options.
+  - Users can respond to the presented questions and submit their answers to the system.
 
-  - The mobile application presents a user interface displaying questions and answer options.
-  - Users can submit their answers by responding to the presented questions.
-
-Desktop Platform:
-
-  - The desktop application provides a user interface with questions and answer options.
-  - Users can submit their answers and view results through graphs.
-
-Result:
-  - Answer Submitted:
-    - After submitting their answers, users can view the results.
-    - Graphs are utilized to visually represent the distribution of answers.
 
